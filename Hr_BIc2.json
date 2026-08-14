@@ -1,0 +1,666 @@
+{
+  "name": "Hr_BIc2",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Application Form",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name ",
+              "placeholder": "Your Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Mail",
+              "placeholder": "mail@gmail.com",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone Number ",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Linked Link ",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "CV",
+              "fieldType": "file",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -1984,
+        -816
+      ],
+      "id": "adaea263-2249-414a-b041-863c98623cb0",
+      "name": "On form submission",
+      "webhookId": "fd74f0d4-5d24-4c1e-b211-250e5cc16d2d"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "CV",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1728,
+        -768
+      ],
+      "id": "c6f5f11d-1e22-48b1-924e-057e511920aa",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "=You are an expert HR Specialist and Applicant Tracking System (ATS) evaluator. \nYour task is to analyze the provided CV text and evaluate it objectively for the target job role.\n\n### INSTRUCTIONS:\n1. Carefully read and analyze the CV text provided below.\n2. Evaluate the candidate based on relevant skills, practical experience, tools, and overall clarity.\n3. Calculate an overall match score as an integer percentage from 0 to 100.\n4. Identify key strengths and main areas for improvement (weaknesses).\n5. Output MUST be ONLY a single valid JSON object. Do NOT include any markdown formatting, preambles, introductory text, or closing notes.\n\n### OUTPUT JSON FORMAT:\n{\n  \"score\": 0,\n  \"strengths\": [\n    \"Point 1\",\n    \"Point 2\",\n    \"Point 3\"\n  ],\n  \"weaknesses\": [\n    \"Point 1\",\n    \"Point 2\"\n  ]\n}\n\n### INPUT CV TEXT:\n{{ $json.text }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1520,
+        -896
+      ],
+      "id": "eaa831fd-c0bf-4166-b98d-0fc1eb483984",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama3.2:3b",
+        "options": {
+          "keepAlive": "1h"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        -1520,
+        -592
+      ],
+      "id": "e6297931-c825-41f1-ab38-c3614e1bf4b7",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "gjFRQLOqRu6k3Fz8",
+          "name": "Ollama account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $input.first().json.output || \"\";\n\n// 1. تنظيف النص الأساسي\nraw = raw.replace(/```json|```/g, \"\").trim();\n\n// 2. استخراج الـ Object فقط\nconst start = raw.indexOf('{');\nconst end = raw.lastIndexOf('}');\n\nif (start !== -1 && end !== -1) {\n  raw = raw.substring(start, end + 1);\n}\n\nlet score = 0;\nlet strengths = [];\nlet weaknesses = [];\n\ntry {\n  // محاولة القراءة المباشرة\n  const parsed = JSON.parse(raw);\n  score = parsed.score || 0;\n  strengths = parsed.strengths || [];\n  weaknesses = parsed.weaknesses || [];\n} catch (e) {\n  // استخراج القيم بـ Regex لو الـ JSON مكسور\n  const scoreMatch = raw.match(/\"score\"\\s*:\\s*(\\d+)/);\n  if (scoreMatch) score = parseInt(scoreMatch[1]);\n\n  const strengthsMatch = raw.match(/\"strengths\"\\s*:\\s*\\[([\\s\\S]*?)\\]\\s*,/);\n  if (strengthsMatch) {\n    strengths = strengthsMatch[1]\n      .split(/\",\\s*\"|\\n/)\n      .map(s => s.replace(/[\"\\\\]/g, '').trim())\n      .filter(Boolean);\n  }\n\n  const weaknessesMatch = raw.match(/\"weaknesses\"\\s*:\\s*\\[([\\s\\S]*?)\\]/);\n  if (weaknessesMatch) {\n    weaknesses = weaknessesMatch[1]\n      .split(/\",\\s*\"|\\n/)\n      .map(s => s.replace(/[\"\\\\]/g, '').trim())\n      .filter(Boolean);\n  }\n}\n\nreturn {\n  score: Number(score),\n  strengths: Array.isArray(strengths) ? strengths.join('\\n• ') : strengths,\n  weaknesses: Array.isArray(weaknesses) ? weaknesses.join('\\n• ') : weaknesses\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1088,
+        -768
+      ],
+      "id": "fff68edc-bad8-444e-a2c0-1aab5102897d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2bb88dd7-7b96-4684-a82d-7bc39eaa8dfb",
+              "leftValue": "={{ $json.score }}",
+              "rightValue": 60,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -928,
+        -864
+      ],
+      "id": "ee938511-af61-4a3a-8e5d-a63087fe09e2",
+      "name": "If",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1xU0K37FPO7FbaSim9UbWEXQvE01JJTpMbsbhEUuUbDM",
+          "mode": "list",
+          "cachedResultName": "BIC2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xU0K37FPO7FbaSim9UbWEXQvE01JJTpMbsbhEUuUbDM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "الورقة1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xU0K37FPO7FbaSim9UbWEXQvE01JJTpMbsbhEUuUbDM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json['Name '] }}",
+            "mail": "={{ $json.Mail }}",
+            "phone": "={{ $json['Phone Number '] }}",
+            "linkedIn link": "={{ $json['Linked Link '] }}",
+            "CV": "={{ $json.CV[0] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "mail",
+              "displayName": "mail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "linkedIn link",
+              "displayName": "linkedIn link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "percentage ",
+              "displayName": "percentage ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "CV",
+              "displayName": "CV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1472,
+        -1184
+      ],
+      "id": "8f995822-06c6-4e65-9c8b-dfc8b5054d50",
+      "name": "accepted",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ExbKge3WEWgveGgJ",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1xU0K37FPO7FbaSim9UbWEXQvE01JJTpMbsbhEUuUbDM",
+          "mode": "list",
+          "cachedResultName": "BIC2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xU0K37FPO7FbaSim9UbWEXQvE01JJTpMbsbhEUuUbDM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "الورقة1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xU0K37FPO7FbaSim9UbWEXQvE01JJTpMbsbhEUuUbDM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "percentage ": "={{ $('Code in JavaScript').item.json.score }}",
+            "Weakness": "={{ $json.weaknesses }}",
+            "strengths": "={{ $json.strengths }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "mail",
+              "displayName": "mail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "linkedIn link",
+              "displayName": "linkedIn link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "percentage ",
+              "displayName": "percentage ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "CV",
+              "displayName": "CV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Weakness",
+              "displayName": "Weakness",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "strengths",
+              "displayName": "strengths",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -448,
+        -848
+      ],
+      "id": "2e5c05cf-691f-4f8a-8149-c86baddeec86",
+      "name": "accepted1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ExbKge3WEWgveGgJ",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('On form submission').item.json.Mail }}",
+        "subject": "=Hi Mr {{ $('On form submission').item.json['Name '] }}",
+        "emailType": "text",
+        "message": "=Congratulations! After reviewing your CV, we are excited to inform you that your profile has been shortlisted for the next stage.  Our HR team will reach out to you shortly via phone or WhatsApp at {{ $json[\"Phone Number\"] }} to schedule your interview.  Please keep an eye on your phone and email. We look forward to speaking with you!  Best regards,  Recruitment Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -416,
+        -1072
+      ],
+      "id": "8189cf73-4cd0-4d65-9355-add2408b7b69",
+      "name": "Send a message",
+      "webhookId": "bb4b15f3-e0cc-4316-b0eb-096e7eb7b6c9",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "d7lu93sqGi2P7Kl8",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1ZZT8jb5JOquQbOUbPLPzlOdOc156RuVxq5Ay7tThVlg",
+          "mode": "list",
+          "cachedResultName": "Bic2Regected",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZZT8jb5JOquQbOUbPLPzlOdOc156RuVxq5Ay7tThVlg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "الورقة1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZZT8jb5JOquQbOUbPLPzlOdOc156RuVxq5Ay7tThVlg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name ": "={{ $('On form submission').item.json['Name '] }}",
+            "mail": "={{ $('On form submission').item.json.Mail }}",
+            "phone": "={{ $('On form submission').item.json['Phone Number '] }}",
+            "cv": "={{ $('On form submission').item.json.CV }}",
+            "percentage": "={{ $('Code in JavaScript').item.json.score }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Name ",
+              "displayName": "Name ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mail",
+              "displayName": "mail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cv",
+              "displayName": "cv",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "percentage",
+              "displayName": "percentage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -384,
+        -608
+      ],
+      "id": "d9639768-f007-4dcb-8d17-64be5e3eb2ee",
+      "name": "Rejected",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ExbKge3WEWgveGgJ",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('On form submission').item.json.Mail }}",
+        "subject": "=Dear {{ $('On form submission').item.json['Name '] }}",
+        "emailType": "text",
+        "message": "=Thank you for your interest in joining our team. After carefully reviewing your application, we regret to inform you that we will not be moving forward with your candidacy at this time, primarily due to:  {{ $('Code in JavaScript').item.json.weaknesses }}.  We truly appreciate your time and wish you the best of luck in your professional journey.  Best regards,  Recruitment Team",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -352,
+        -384
+      ],
+      "id": "26d4b744-a929-45d9-941d-35f1f07109dd",
+      "name": "Send a message1",
+      "webhookId": "26c1e067-a37d-44a3-a151-3eb35daffa3b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "d7lu93sqGi2P7Kl8",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "ziadnasar6@gmail.com",
+        "subject": "Mr Nassar",
+        "emailType": "text",
+        "message": "=Hi Mr There is a New Employee With Rate  {{ $('Code in JavaScript').item.json.score }}\nInfo about : \nName : {{ $('On form submission').item.json['Name '] }}\nPhone Number {{ $('On form submission').item.json['Phone Number '] }}\nlinked In : \n{{ $('On form submission').item.json['Linked Link '] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -688,
+        -1152
+      ],
+      "id": "e1543bcf-279f-44b5-8902-5e51c82249bf",
+      "name": "Send a message2",
+      "webhookId": "4e8d8606-9a36-48b7-81eb-97f3dfcd3b13",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "d7lu93sqGi2P7Kl8",
+          "name": "Gmail account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "accepted1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rejected",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "7ef5fa50-d185-430d-b3e8-8cd3a39aeaed",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1683654809315c19d0a840f8124382572658b780e6471abee7e4b55976cd39e6"
+  },
+  "nodeGroups": [],
+  "id": "r70MHVKciYrtZ9il",
+  "tags": []
+}
